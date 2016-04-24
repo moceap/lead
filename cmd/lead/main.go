@@ -35,6 +35,7 @@ func main() {
 		if *red >= 0 {
 			c.SetRGB(*red, *green, *blue)
 		}
+		c.Close()
 	}
 }
 

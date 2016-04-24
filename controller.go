@@ -96,6 +96,13 @@ func (c *Controller) SetRGB(r, g, b float64) error {
 	return msg.writeTo(c.conn)
 }
 
+func (c *Controller) Close() error {
+	if c.conn != nil {
+		return c.conn.Close()
+	}
+	return nil
+}
+
 func clamp(v float64, r uint8) uint8 {
 	t := int(v * float64(r))
 	if t < 0 {
