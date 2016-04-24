@@ -14,10 +14,11 @@ func main() {
 	red := flag.Float64("red", -1, "Set red")
 	green := flag.Float64("green", -1, "Set green")
 	blue := flag.Float64("blue", -1, "Set blue")
-	flag.BoolVar(&lead.Debug, "debug", lead.Debug, "Debug")
+	network := flag.String("network", "172.16.32.0/24", "Network to discover")
+	flag.BoolVar(&lead.Debug, "debug", lead.Debug, "Print debug information")
 	flag.Parse()
 
-	cs, err := lead.Discover("172.16.32.0/24")
+	cs, err := lead.Discover(*network)
 	if err != nil {
 		log.Fatal(err)
 	}
