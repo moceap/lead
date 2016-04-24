@@ -13,10 +13,12 @@ const (
 	setBrightness  = 0x84c
 )
 
+var Debug = false
+
 var defaultMessage = message{
-	Magic1: 0x5599f13d,
-	Magic2: 0x0200,
-	End:    0xaaaa,
+	magic1: 0x5599f13d, // No idea what this is
+	magic2: 0x0200,     // nor this
+	magic3: 0xaaaa,     // seriously
 }
 
 type Controller struct {
@@ -44,8 +46,12 @@ func (c *Controller) SetBrightness(b float64) error {
 	}
 
 	msg := defaultMessage
-	msg.Command = setBrightness
-	msg.Value = clamp(b, 0x3f)
+	msg.command = setBrightness
+	msg.value = clamp(b, 0x3f)
+
+	if Debug {
+		msg.print()
+	}
 
 	return msg.writeTo(c.conn)
 }
@@ -56,24 +62,36 @@ func (c *Controller) SetRGB(r, g, b float64) error {
 	}
 
 	msg := defaultMessage
-	msg.Command = setRed
-	msg.Value = clamp(r, 0xff)
+	msg.command = setRed
+	msg.value = clamp(r, 0xff)
+
+	if Debug {
+		msg.print()
+	}
 
 	if err := msg.writeTo(c.conn); err != nil {
 		return err
 	}
 
-	msg.Command = setGreen
-	msg.Value = clamp(g, 0xff)
+	msg.command = setGreen
+	msg.value = clamp(g, 0xff)
 	msg.check()
+
+	if Debug {
+		msg.print()
+	}
 
 	if err := msg.writeTo(c.conn); err != nil {
 		return err
 	}
 
-	msg.Command = setBlue
-	msg.Value = clamp(b, 0xff)
+	msg.command = setBlue
+	msg.value = clamp(b, 0xff)
 	msg.check()
+
+	if Debug {
+		msg.print()
+	}
 
 	return msg.writeTo(c.conn)
 }

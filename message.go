@@ -9,32 +9,33 @@ import (
 )
 
 type message struct {
-	Magic1  uint32
-	Magic2  uint16
-	Command uint16
-	Value   uint8
-	Check   uint8
-	End     uint16
+	magic1   uint32
+	magic2   uint16
+	command  uint16
+	value    uint8
+	checksum uint8
+	magic3   uint16
 }
 
 func (m *message) check() {
 	var c = uint8(0xe4)
-	c += uint8(m.Magic1 >> 24)
-	c += uint8(m.Magic1 >> 16)
-	c += uint8(m.Magic1 >> 8)
-	c += uint8(m.Magic1)
-	c += uint8(m.Magic2 >> 8)
-	c += uint8(m.Magic2)
-	c += uint8(m.Command >> 8)
-	c += uint8(m.Command)
-	c += uint8(m.Value)
-	m.Check = c
+	c += uint8(m.magic1 >> 24)
+	c += uint8(m.magic1 >> 16)
+	c += uint8(m.magic1 >> 8)
+	c += uint8(m.magic1)
+	c += uint8(m.magic2 >> 8)
+	c += uint8(m.magic2)
+	c += uint8(m.command >> 8)
+	c += uint8(m.command)
+	c += uint8(m.value)
+	m.checksum = c
 }
 
 func (m *message) print() {
+	m.check()
 	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.BigEndian, m)
-	fmt.Println(hex.Dump(buf.Bytes()))
+	fmt.Printf(hex.Dump(buf.Bytes()))
 }
 
 func (m *message) writeTo(w io.Writer) error {
