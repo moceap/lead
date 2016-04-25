@@ -1,10 +1,7 @@
 package lead
 
 import (
-	"bytes"
 	"encoding/binary"
-	"encoding/hex"
-	"fmt"
 	"io"
 )
 
@@ -29,13 +26,6 @@ func (m *message) check() {
 	c += uint8(m.command)
 	c += uint8(m.value)
 	m.checksum = c
-}
-
-func (m *message) print() {
-	m.check()
-	buf := new(bytes.Buffer)
-	binary.Write(buf, binary.BigEndian, m)
-	fmt.Printf(hex.Dump(buf.Bytes()))
 }
 
 func (m *message) writeTo(w io.Writer) error {

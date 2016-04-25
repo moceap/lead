@@ -1,6 +1,7 @@
 package lead
 
 import (
+	"errors"
 	"net"
 	"time"
 )
@@ -13,25 +14,42 @@ const (
 	setBrightness  = 0x84c
 )
 
-var Debug = false
-
 var defaultMessage = message{
 	magic1: 0x5599f13d, // No idea what this is
 	magic2: 0x0200,     // nor this
 	magic3: 0xaaaa,     // seriously
 }
 
+// A Controller is a Lead Energy WiFi LED controller.
 type Controller struct {
-	Address string
-	Serial  string
-	Model   string
-
-	conn net.Conn
+	address string
+	serial  string
+	model   string
+	conn    net.Conn
 }
+
+// NewController returns a new controller object for the given address. See
+// also Discover() to return a list of Controllers on a given LAN segment.
+func NewController(address string) *Controller {
+	return &Controller{
+		address: address,
+	}
+}
+
+// Address returns the address (ip:port) of the LED controller.
+func (c *Controller) Address() string { return c.address }
+
+// Model returns the model number for the WiFi controller. This is set only
+// if the Controller is created via Discover().
+func (c *Controller) Model() string { return c.model }
+
+// Serial returns the serial number for the WiFi controller. This is set
+// only if the Controller is created via Discover().
+func (c *Controller) Serial() string { return c.serial }
 
 func (c *Controller) lazyConnect() error {
 	if c.conn == nil {
-		conn, err := net.DialTimeout("tcp", c.Address, connectTimeout)
+		conn, err := net.DialTimeout("tcp", c.address, connectTimeout)
 		if err != nil {
 			return err
 		}
@@ -40,76 +58,64 @@ func (c *Controller) lazyConnect() error {
 	return nil
 }
 
-func (c *Controller) SetBrightness(b float64) error {
+// SetBrightness sets the brightness factor. The range of
+// valid values is 0 through 63 inclusive.
+func (c *Controller) SetBrightness(b int) error {
 	if err := c.lazyConnect(); err != nil {
 		return err
+	}
+
+	if b < 0 || b > 0x3F {
+		return errors.New("value out of range")
 	}
 
 	msg := defaultMessage
 	msg.command = setBrightness
-	msg.value = clamp(b, 0x3f)
-
-	if Debug {
-		msg.print()
-	}
+	msg.value = uint8(b)
 
 	return msg.writeTo(c.conn)
 }
 
-func (c *Controller) SetRGB(r, g, b float64) error {
+// SetRGB sets the color. The range of valid values for r, g and b is 0
+// through 255, inclusive.
+func (c *Controller) SetRGB(r, g, b int) error {
 	if err := c.lazyConnect(); err != nil {
 		return err
 	}
 
+	if r < 0 || r > 0xFF || g < 0 || g > 0xFF || b < 0 || b > 0xFF {
+		return errors.New("value out of range")
+	}
+
 	msg := defaultMessage
 	msg.command = setRed
-	msg.value = clamp(r, 0xff)
-
-	if Debug {
-		msg.print()
-	}
+	msg.value = uint8(r)
 
 	if err := msg.writeTo(c.conn); err != nil {
 		return err
 	}
 
 	msg.command = setGreen
-	msg.value = clamp(g, 0xff)
+	msg.value = uint8(g)
 	msg.check()
-
-	if Debug {
-		msg.print()
-	}
 
 	if err := msg.writeTo(c.conn); err != nil {
 		return err
 	}
 
 	msg.command = setBlue
-	msg.value = clamp(b, 0xff)
+	msg.value = uint8(b)
 	msg.check()
-
-	if Debug {
-		msg.print()
-	}
 
 	return msg.writeTo(c.conn)
 }
 
+// Close closes the connection to the LED controller.
 func (c *Controller) Close() error {
 	if c.conn != nil {
-		return c.conn.Close()
+		err := c.conn.Close()
+		c.conn = nil
+		return err
 	}
 	return nil
-}
-
-func clamp(v float64, r uint8) uint8 {
-	t := int(v * float64(r))
-	if t < 0 {
-		return 0
-	}
-	if t > int(r) {
-		return r
-	}
-	return uint8(t)
 }

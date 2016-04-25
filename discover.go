@@ -14,7 +14,16 @@ const (
 	serverPort      = "8899"
 )
 
+// Discover performs network discovery on a given LAN segment and returns a
+// list of discovered LED controllers, or an error. The network should be
+// given in CIDR form, i.e. 172.16.32.0/24. The discovery mechanism is based
+// on IPv4 broadcasts so will only function on directly connected interfaces
+// with an IPv4 address.
 func Discover(network string) ([]*Controller, error) {
+	return discover(network, discoveryProbes, discoveryIntv)
+}
+
+func discover(network string, probes int, intv time.Duration) ([]*Controller, error) {
 	_, ipnet, err := net.ParseCIDR(network)
 	if err != nil {
 		return nil, err
@@ -29,16 +38,16 @@ func Discover(network string) ([]*Controller, error) {
 	bc := bcast(ipnet)
 
 	go func() {
-		for i := 0; i < discoveryProbes; i++ {
+		for i := 0; i < probes; i++ {
 			conn.WriteTo([]byte(discoveryReq), &net.UDPAddr{IP: bc.IP, Port: discoveryPort})
-			time.Sleep(discoveryIntv)
+			time.Sleep(intv)
 		}
 	}()
 
 	t0 := time.Now()
 	buf := make([]byte, 128)
 	res := make(map[string]struct{})
-	for time.Since(t0) < discoveryProbes*discoveryIntv {
+	for time.Since(t0) < time.Duration(probes)*intv {
 		conn.SetReadDeadline(time.Now().Add(discoveryIntv))
 		n, err := conn.Read(buf)
 		if err != nil {
@@ -59,9 +68,9 @@ func Discover(network string) ([]*Controller, error) {
 			continue
 		}
 		ctrls = append(ctrls, &Controller{
-			Address: net.JoinHostPort(fields[0], serverPort),
-			Serial:  fields[1],
-			Model:   fields[2],
+			address: net.JoinHostPort(fields[0], serverPort),
+			serial:  fields[1],
+			model:   fields[2],
 		})
 	}
 	return ctrls, nil
