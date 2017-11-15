@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/alecthomas/kingpin"
 	"github.com/calmh/lead"
 )
 
@@ -18,52 +19,60 @@ var (
 )
 
 func main() {
-	flag.StringVar(&discover, "discover", "", "Perform discovery on `network` (i.e., 172.16.32.0/24)")
-	flag.StringVar(&controller, "controller", "", "Connect to controller at `address` (i.e., 172.16.32.185:8899)")
-	flag.Var(&brightness, "brightness", "Set brightness to `N` (0..63)")
-	flag.Var(&color, "color", "Set color to `R,G,B` (0..255)")
-	flag.Usage = func() {
-		fmt.Println("Usage:")
-		fmt.Println("  lead -discover <network> [-brightness N] [-color R,G,B]")
-		fmt.Println("  lead -controller <address> [-brightness N] [-color R,G,B]")
-		fmt.Println("")
-		fmt.Println("Options:")
-		flag.PrintDefaults()
-	}
-	flag.Parse()
+	discover := kingpin.Flag("discover", "Perform discovery on NETWORK (i.e., 172.16.32.0/24)").PlaceHolder("NETWORK").String()
+	controller := kingpin.Flag("controller", "Connect to controller at ADDRESS (i.e., 172.16.32.185:8899)").PlaceHolder("ADDRESS").String()
 
-	if controller == "" && discover == "" {
-		fmt.Println("Need one of -controller or -discover options")
+	cmdOn := kingpin.Command("on", "Turn on")
+	cmdOff := kingpin.Command("off", "Turn on")
+
+	cmdBrightness := kingpin.Command("brightness", "Set brightness (0-63)")
+	brightness := cmdBrightness.Arg("brightness", "Brightness value").Int()
+
+	cmdColor := kingpin.Command("color", "Set color (0-255, three octets RGB)")
+	color := cmdColor.Arg("color", "Color value").Ints()
+
+	cmd := kingpin.Parse()
+
+	if *discover == "" && *controller == "" {
+		fmt.Println("Need one of --controller or --discover options")
 		flag.Usage()
 		os.Exit(2)
 	}
 
 	var cs []*lead.Controller
-	if controller != "" {
-		cs = append(cs, lead.NewController(controller))
+	if *controller != "" {
+		cs = append(cs, lead.NewController(*controller))
 	}
-	if discover != "" {
-		tcs, err := lead.Discover(discover)
+
+	if *discover != "" {
+		tcs, err := lead.Discover(*discover)
 		if err != nil {
 			fmt.Println("Discovering controllers:", err)
 			os.Exit(1)
-		}
-		fmt.Printf("Discovered %d controllers\n", len(tcs))
-		for _, c := range tcs {
-			fmt.Printf("  %s (%s, %s)\n", c.Address(), c.Model(), c.Serial())
 		}
 		cs = append(cs, tcs...)
 	}
 
 	for _, c := range cs {
-		if brightness.isSet {
-			if err := c.SetBrightness(brightness.val); err != nil {
+		switch cmd {
+		case cmdBrightness.FullCommand():
+			if err := c.SetBrightness(*brightness); err != nil {
 				fmt.Printf("Setting brightness on %s: %v\n", c.Address(), err)
 			}
-		}
-		if color.isSet {
-			if err := c.SetRGB(color.red, color.green, color.blue); err != nil {
+
+		case cmdColor.FullCommand():
+			if err := c.SetRGB((*color)[0], (*color)[1], (*color)[2]); err != nil {
 				fmt.Printf("Setting RGB on %s: %v\n", c.Address(), err)
+			}
+
+		case cmdOn.FullCommand():
+			if err := c.SetOn(true); err != nil {
+				fmt.Printf("Turning on %s: %v\n", c.Address(), err)
+			}
+
+		case cmdOff.FullCommand():
+			if err := c.SetOn(false); err != nil {
+				fmt.Printf("Turning off %s: %v\n", c.Address(), err)
 			}
 		}
 		c.Close()

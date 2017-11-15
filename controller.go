@@ -12,6 +12,9 @@ const (
 	setGreen       = 0x849
 	setBlue        = 0x84a
 	setBrightness  = 0x84c
+	setOnOff       = 0x212
+	bitsOn         = 0xab
+	bitsOff        = 0xa9
 )
 
 var defaultMessage = message{
@@ -106,6 +109,22 @@ func (c *Controller) SetRGB(r, g, b int) error {
 	msg.command = setBlue
 	msg.value = uint8(b)
 	msg.check()
+
+	return msg.writeTo(c.conn)
+}
+
+func (c *Controller) SetOn(on bool) error {
+	if err := c.lazyConnect(); err != nil {
+		return err
+	}
+
+	msg := defaultMessage
+	msg.command = setOnOff
+	if on {
+		msg.value = bitsOn
+	} else {
+		msg.value = bitsOff
+	}
 
 	return msg.writeTo(c.conn)
 }
