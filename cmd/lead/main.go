@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/csv"
 	"flag"
 	"fmt"
 	"os"
@@ -19,8 +20,11 @@ var (
 )
 
 func main() {
-	discover := kingpin.Flag("discover", "Perform discovery on NETWORK (i.e., 172.16.32.0/24)").PlaceHolder("NETWORK").String()
-	controller := kingpin.Flag("controller", "Connect to controller at ADDRESS (i.e., 172.16.32.185:8899)").PlaceHolder("ADDRESS").String()
+	addr := kingpin.Flag("addr", "Connect to controller at ADDRESS (i.e., 172.16.32.185:8899)").PlaceHolder("ADDRESS").String()
+	file := kingpin.Flag("file", "List of controllers, one per line, like the output of `discover`").PlaceHolder("FILE").ExistingFile()
+
+	cmdDiscover := kingpin.Command("discover", "Discover controllers")
+	argNetwork := cmdDiscover.Arg("network", "Network (i.e., 172.16.32.0/24) to probe").Required().String()
 
 	cmdOn := kingpin.Command("on", "Turn on")
 	cmdOff := kingpin.Command("off", "Turn on")
@@ -33,24 +37,44 @@ func main() {
 
 	cmd := kingpin.Parse()
 
-	if *discover == "" && *controller == "" {
-		fmt.Println("Need one of --controller or --discover options")
+	if cmd == cmdDiscover.FullCommand() {
+		tcs, err := lead.Discover(*argNetwork)
+		if err != nil {
+			fmt.Println("Discovering controllers:", err)
+			os.Exit(1)
+		}
+		for _, tc := range tcs {
+			fmt.Printf("%s,%s,%s\n", tc.Address(), tc.Model(), tc.Serial())
+		}
+		os.Exit(0)
+	}
+
+	if *addr == "" && *file == "" {
+		fmt.Println("Need one of --addr or --file options")
 		flag.Usage()
 		os.Exit(2)
 	}
 
 	var cs []*lead.Controller
-	if *controller != "" {
-		cs = append(cs, lead.NewController(*controller))
+	if *addr != "" {
+		cs = append(cs, lead.NewController(*addr))
 	}
 
-	if *discover != "" {
-		tcs, err := lead.Discover(*discover)
+	if *file != "" {
+		fd, err := os.Open(*file)
 		if err != nil {
-			fmt.Println("Discovering controllers:", err)
+			fmt.Println("Reading controllers:", err)
 			os.Exit(1)
 		}
-		cs = append(cs, tcs...)
+		cr := csv.NewReader(fd)
+		recs, err := cr.ReadAll()
+		if err != nil {
+			fmt.Println("Reading controllers:", err)
+			os.Exit(1)
+		}
+		for _, rec := range recs {
+			cs = append(cs, lead.NewController(rec[0]))
+		}
 	}
 
 	for _, c := range cs {
