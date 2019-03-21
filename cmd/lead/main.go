@@ -27,7 +27,7 @@ func main() {
 	argNetwork := cmdDiscover.Arg("network", "Network (i.e., 172.16.32.0/24) to probe").Required().String()
 
 	cmdOn := kingpin.Command("on", "Turn on")
-	cmdOff := kingpin.Command("off", "Turn on")
+	cmdOff := kingpin.Command("off", "Turn off")
 
 	cmdBrightness := kingpin.Command("brightness", "Set brightness (0-63)")
 	brightness := cmdBrightness.Arg("brightness", "Brightness value").Int()
